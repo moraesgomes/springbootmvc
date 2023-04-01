@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +33,9 @@ public class PessoaController {
 	
 	@Autowired
 	private TelefoneRepository telefoneRepository;
+	
+	@Autowired
+	private ReportUtil reportUtil;
 	
 	@RequestMapping(method = RequestMethod.GET, value = "/cadastropessoa")
 	public ModelAndView inicio() {
@@ -134,6 +139,67 @@ public class PessoaController {
 		
 		return modelAndView;
 			
+	}
+	
+	@GetMapping("**/pesquisarpessoa")
+	public void imprimePdf(@RequestParam("nomepesquisa")String nomepesquisa,
+			@RequestParam("pesquisasexo") String pesquisasexo,
+			HttpServletRequest request,
+			HttpServletResponse response) throws Exception{
+		
+		
+		List<Pessoa>pessoas = new ArrayList<Pessoa>();
+		
+		if(pesquisasexo !=null  && !pesquisasexo.isEmpty()
+				&& nomepesquisa !=null && !nomepesquisa.isEmpty()) {
+			
+			pessoas = pessoaRepository.findPessoaByNameSexo(nomepesquisa, pesquisasexo);
+			
+		} else if(nomepesquisa != null && !nomepesquisa.isEmpty() ) {
+			
+			pessoas = pessoaRepository.findPessoaByName(nomepesquisa);
+			
+		}
+		
+      else if(pesquisasexo != null && !pesquisasexo.isEmpty() ) {
+			
+			pessoas = pessoaRepository.findPessoaBySexo(pesquisasexo);
+			
+		}
+		
+		else {
+			
+			Iterable<Pessoa> iterator =  pessoaRepository.findAll();
+			
+			for (Pessoa pessoa : iterator) {
+				
+				pessoas.add(pessoa);
+				
+			}
+		}
+		
+		// Chamar o serviço que gera o relatório
+		
+		byte[] pdf  = reportUtil.gerarRelatorio(pessoas, "pessoa",request.getServletContext());
+		
+		// Tamanho da resposta para o navegador
+		
+		response.setContentLength(pdf.length);
+		
+		// definir o tipo de arquivo na resposta
+		
+		response.setContentType("application/octet-stream");
+		
+		// Definir o cabeçalho da resposta
+		
+		String headerKey = "Content-Disposition";
+		String headerValue = String.format("attachment; filename=\"%s\"", "relatoriopessoa.pdf");
+		response.setHeader(headerKey, headerValue);
+		
+		// Finaliza a resposta para o navegador
+		
+		response.getOutputStream().write(pdf);
+		
 	}
 	
 	@GetMapping("/telefones/{idpessoa}")
